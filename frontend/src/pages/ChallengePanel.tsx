@@ -21,6 +21,8 @@ export const ChallengePanel: React.FC = () => {
     error,
     selectedFile,
     setSelectedFile,
+    selectedJdFile,
+    setSelectedJdFile,
     progressPercent,
     progressStep,
     progressLogs,
@@ -29,6 +31,7 @@ export const ChallengePanel: React.FC = () => {
   } = useChallenge();
   
   const [dragActive, setDragActive] = useState(false);
+  const [jdDragActive, setJdDragActive] = useState(false);
   
   // Advanced search filters state
   const [searchQuery, setSearchQuery] = useState("");
@@ -130,6 +133,54 @@ export const ChallengePanel: React.FC = () => {
     setSelectedFile(selectedFile);
   };
 
+  const handleJdDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") setJdDragActive(true);
+    else if (e.type === "dragleave") setJdDragActive(false);
+  };
+
+  const handleJdDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setJdDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      validateAndSetJdFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleJdFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      validateAndSetJdFile(e.target.files[0]);
+    }
+  };
+
+  const validateAndSetJdFile = (file: File) => {
+    setError(null);
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    if (ext !== "docx" && ext !== "txt") {
+      setError("Unsupported format. Please upload a .docx or .txt Job Description file.");
+      return;
+    }
+    setSelectedJdFile(file);
+  };
+
+  const handleDownloadXLSX = async () => {
+    try {
+      const blob = await apiService.exportChallengeXLSX() as Blob;
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "participant_submission.xlsx");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert("Failed to download results: " + (err.message || "Unknown error"));
+    }
+  };
+
 
 
   // Filter the list of top candidates locally based on advanced search criteria
@@ -205,97 +256,148 @@ export const ChallengePanel: React.FC = () => {
             Redrob Challenge Control Panel
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Discovery pipeline: Ingestion of 100,000 candidates → FAISS search → LTR ranking → CSV Export & Validation.
+            Upload a Job Description + Candidates → Run Pipeline → Download Results as Excel.
           </p>
         </div>
 
-        <button
-          onClick={handleRunPipeline}
-          disabled={running}
-          className="flex h-10 items-center justify-center gap-2 rounded-lg bg-red-500 px-5 text-sm font-semibold text-white shadow-sm hover:bg-red-600 transition-all disabled:opacity-50 cursor-pointer"
-        >
-          {running ? (
-            <>
-              <RefreshCw className="h-4 w-4 animate-spin" />
-              <span>Streaming & Ranking (CPU)...</span>
-            </>
-          ) : (
-            <>
-              <Play className="h-4 w-4" />
-              <span>Run Pipeline Offline</span>
-            </>
+        <div className="flex items-center gap-2">
+          {results && results.validation_passed && (
+            <button
+              onClick={handleDownloadXLSX}
+              className="flex h-10 items-center justify-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-5 text-sm font-semibold text-emerald-700 shadow-sm hover:bg-emerald-100 transition-all cursor-pointer"
+            >
+              <FileText className="h-4 w-4" />
+              <span>Download Results (.xlsx)</span>
+            </button>
           )}
-        </button>
+          <button
+            onClick={handleRunPipeline}
+            disabled={running}
+            className="flex h-10 items-center justify-center gap-2 rounded-lg bg-red-500 px-5 text-sm font-semibold text-white shadow-sm hover:bg-red-600 transition-all disabled:opacity-50 cursor-pointer"
+          >
+            {running ? (
+              <>
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                <span>Running Pipeline...</span>
+              </>
+            ) : (
+              <>
+                <Play className="h-4 w-4" />
+                <span>Run Pipeline</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
-      {/* Dataset Upload Area */}
-      <GlassCard className="mb-6 p-0">
-        <input
-          type="file"
-          id="jsonl-upload"
-          className="hidden"
-          accept=".jsonl"
-          onChange={handleFileChange}
-        />
-        
-        {selectedFile ? (
-          <div
-            onDragEnter={handleDrag}
-            onDragOver={handleDrag}
-            onDragLeave={handleDrag}
-            onDrop={handleDrop}
-            className="flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-8 text-center border-slate-200"
-          >
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-50 border border-slate-200 text-slate-500 mb-3">
-              <UploadCloud className="h-5 w-5" />
-            </div>
-            <div className="space-y-2">
-              <p className="text-sm font-semibold text-slate-900 flex items-center justify-center gap-1.5">
-                <FileText className="h-4 w-4 text-slate-400" />
-                {selectedFile.name}
-              </p>
-              <p className="text-xs text-slate-400">
-                {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
-              </p>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedFile(null);
-                }}
-                className="text-xs font-semibold text-red-500 hover:underline cursor-pointer"
+      {/* Upload Steps Area */}
+      <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Step 1: Job Description */}
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-1.5">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold">1</span>
+            Upload Job Description
+          </p>
+          <GlassCard className="p-0">
+            <input
+              type="file"
+              id="jd-upload"
+              className="hidden"
+              accept=".docx,.txt"
+              onChange={handleJdFileChange}
+            />
+            {selectedJdFile ? (
+              <div className="flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-6 text-center border-emerald-300 bg-emerald-50/30">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-600 mb-2">
+                  <FileText className="h-4 w-4" />
+                </div>
+                <p className="text-xs font-semibold text-slate-900">{selectedJdFile.name}</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">{(selectedJdFile.size / 1024).toFixed(1)} KB</p>
+                <button
+                  onClick={() => setSelectedJdFile(null)}
+                  className="mt-2 text-xs font-semibold text-red-500 hover:underline cursor-pointer"
+                >
+                  Remove file
+                </button>
+              </div>
+            ) : (
+              <label
+                htmlFor="jd-upload"
+                onDragEnter={handleJdDrag}
+                onDragOver={handleJdDrag}
+                onDragLeave={handleJdDrag}
+                onDrop={handleJdDrop}
+                className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
+                  jdDragActive ? "border-red-500 bg-red-50/10" : "border-slate-200 hover:border-slate-300"
+                }`}
               >
-                Remove file (runs default candidates.jsonl)
-              </button>
-            </div>
-          </div>
-        ) : (
-          <label
-            htmlFor="jsonl-upload"
-            onDragEnter={handleDrag}
-            onDragOver={handleDrag}
-            onDragLeave={handleDrag}
-            onDrop={handleDrop}
-            className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
-              dragActive 
-                ? "border-red-500 bg-red-50/10" 
-                : "border-slate-200 hover:border-slate-300"
-            }`}
-          >
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-50 border border-slate-200 text-slate-500 mb-3">
-              <UploadCloud className="h-5 w-5" />
-            </div>
-            <div>
-              <span className="text-xs font-semibold text-red-500 hover:text-red-600">
-                Click to upload custom dataset
-              </span>
-              <span className="text-xs text-slate-500"> or drag and drop candidates.jsonl</span>
-              <p className="mt-1 text-[11px] text-slate-400">
-                Leave empty to run the pre-configured local dataset
-              </p>
-            </div>
-          </label>
-        )}
-      </GlassCard>
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-50 border border-slate-200 text-slate-500 mb-2">
+                  <UploadCloud className="h-4 w-4" />
+                </div>
+                <span className="text-xs font-semibold text-red-500 hover:text-red-600">Click to upload JD</span>
+                <span className="text-xs text-slate-500"> or drag and drop</span>
+                <p className="mt-1 text-[11px] text-slate-400">.docx or .txt — leave empty to use default</p>
+              </label>
+            )}
+          </GlassCard>
+        </div>
+
+        {/* Step 2: Candidates Dataset */}
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-1.5">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold">2</span>
+            Upload Candidates Dataset
+          </p>
+          <GlassCard className="p-0">
+            <input
+              type="file"
+              id="jsonl-upload"
+              className="hidden"
+              accept=".jsonl"
+              onChange={handleFileChange}
+            />
+            {selectedFile ? (
+              <div
+                onDragEnter={handleDrag}
+                onDragOver={handleDrag}
+                onDragLeave={handleDrag}
+                onDrop={handleDrop}
+                className="flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-6 text-center border-emerald-300 bg-emerald-50/30"
+              >
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-600 mb-2">
+                  <FileText className="h-4 w-4" />
+                </div>
+                <p className="text-xs font-semibold text-slate-900">{selectedFile.name}</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">{(selectedFile.size / (1024 * 1024)).toFixed(2)} MB</p>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setSelectedFile(null); }}
+                  className="mt-2 text-xs font-semibold text-red-500 hover:underline cursor-pointer"
+                >
+                  Remove file (runs default candidates.jsonl)
+                </button>
+              </div>
+            ) : (
+              <label
+                htmlFor="jsonl-upload"
+                onDragEnter={handleDrag}
+                onDragOver={handleDrag}
+                onDragLeave={handleDrag}
+                onDrop={handleDrop}
+                className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
+                  dragActive ? "border-red-500 bg-red-50/10" : "border-slate-200 hover:border-slate-300"
+                }`}
+              >
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-50 border border-slate-200 text-slate-500 mb-2">
+                  <UploadCloud className="h-4 w-4" />
+                </div>
+                <span className="text-xs font-semibold text-red-500 hover:text-red-600">Click to upload candidates.jsonl</span>
+                <span className="text-xs text-slate-500"> or drag and drop</span>
+                <p className="mt-1 text-[11px] text-slate-400">Leave empty to run pre-configured local dataset</p>
+              </label>
+            )}
+          </GlassCard>
+        </div>
+      </div>
 
       {/* Real-time Progress Section */}
       {running && (

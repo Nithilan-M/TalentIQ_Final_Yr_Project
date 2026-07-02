@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { apiService } from "../services/api";
+import { authService } from "../services/auth";
 
 interface ChallengeContextType {
   running: boolean;
@@ -8,6 +9,8 @@ interface ChallengeContextType {
   error: string | null;
   selectedFile: File | null;
   setSelectedFile: (file: File | null) => void;
+  selectedJdFile: File | null;
+  setSelectedJdFile: (file: File | null) => void;
   progressPercent: number;
   progressStep: string;
   progressLogs: string[];
@@ -24,13 +27,16 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [validation, setValidation] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedJdFile, setSelectedJdFile] = useState<File | null>(null);
   const [progressPercent, setProgressPercent] = useState(0);
   const [progressStep, setProgressStep] = useState("");
   const [progressLogs, setProgressLogs] = useState<string[]>([]);
 
   // Load any existing pipeline result on mount
   useEffect(() => {
-    checkExistingSubmission();
+    if (authService.isAuthenticated()) {
+      checkExistingSubmission();
+    }
   }, []);
 
   const checkExistingSubmission = async () => {
@@ -65,6 +71,7 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     try {
       await apiService.runChallengePipelineStream(
         selectedFile || undefined,
+        selectedJdFile || undefined,
         (update) => {
           if (update.status === "processing") {
             setProgressPercent(update.progress);
@@ -106,6 +113,8 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         error,
         selectedFile,
         setSelectedFile,
+        selectedJdFile,
+        setSelectedJdFile,
         progressPercent,
         progressStep,
         progressLogs,

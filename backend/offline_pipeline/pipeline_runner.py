@@ -15,7 +15,11 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 JSONL_PATH = os.path.join(project_root, "India_runs_data_and_ai_challenge", "candidates.jsonl")
 SUBMISSION_CSV_PATH = os.path.join(project_root, "India_runs_data_and_ai_challenge", "participant_submission.csv")
 
-async def run_offline_ranking_pipeline(input_jsonl: str = None, output_csv: str = SUBMISSION_CSV_PATH):
+async def run_offline_ranking_pipeline(
+    input_jsonl: str = None,
+    input_jd: str = None,
+    output_csv: str = SUBMISSION_CSV_PATH
+):
     """
     Executes the complete offline ranking pipeline and validates the result.
     Yields progress status dictionary.
@@ -30,7 +34,10 @@ async def run_offline_ranking_pipeline(input_jsonl: str = None, output_csv: str 
     # Step 1: Load Job Description (Must-have/Nice-to-have JSON)
     yield {"status": "processing", "progress": 10, "message": "Loading Job Description...", "step": "load_jd"}
     start = time.time()
-    jd_data = await jd_loader.get_structured_jd()
+    if input_jd:
+        jd_data = await jd_loader.get_structured_jd_from_file(input_jd)
+    else:
+        jd_data = await jd_loader.get_structured_jd()
     timers["load_jd"] = time.time() - start
     print(f"[Timer] Loaded Job Description in {timers['load_jd']:.4f} seconds.")
     yield {"status": "processing", "progress": 20, "message": f"Loaded Job Description in {timers['load_jd']:.2f}s.", "step": "load_jd_done"}

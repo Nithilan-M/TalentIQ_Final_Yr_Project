@@ -122,6 +122,17 @@ class LearningToRankModel:
         if not self.model:
             self.load_model()
 
+        # Ensure we only pass the features the model was trained on and in the correct order
+        if isinstance(X, pd.DataFrame):
+            # Make a copy to avoid SettingWithCopy warnings
+            X_filtered = X.copy()
+            for col in self.feature_names:
+                if col not in X_filtered.columns:
+                    X_filtered[col] = 0.0
+            X_filtered = X_filtered[self.feature_names]
+        else:
+            X_filtered = X
+
         if self.model == "heuristic" or not self.model:
             # Fallback heuristic: calculate weighted sum
             # Skill Match: 30%, Embedding: 20%, Experience: 20%, Career Progression: 15%, Behavioral: 15%
@@ -132,17 +143,17 @@ class LearningToRankModel:
                 "career_progression_score": 0.15,
                 "behavioral_score": 0.15
             }
-            scores = np.zeros(len(X))
+            scores = np.zeros(len(X_filtered))
             for col, w in weights.items():
-                if col in X.columns:
+                if col in X_filtered.columns:
                     if col == "embedding_similarity":
-                        scores += X[col].values * w
+                        scores += X_filtered[col].values * w
                     else:
-                        scores += (X[col].values / 100.0) * w * 100.0
+                        scores += (X_filtered[col].values / 100.0) * w * 100.0
             return scores
 
         try:
-            return self.model.predict(X)
+            return self.model.predict(X_filtered)
         except Exception as e:
             print(f"Inference failed: {e}. Reverting to heuristic.")
             # Simple average of Skill Match and Embedding Similarity
@@ -168,8 +179,12 @@ class LearningToRankModel:
         try:
             if hasattr(self.model, "feature_importances_"):
                 importances = self.model.feature_importances_
-                # Normalize
-                importances = importances / np.sum(importances)
+                # Normalize safely
+                total = np.sum(importances)
+                if total > 0:
+                    importances = importances / total
+                else:
+                    importances = np.ones_like(importances) / len(importances)
                 return dict(zip(self.feature_names, [float(v) for v in importances]))
         except Exception:
             pass

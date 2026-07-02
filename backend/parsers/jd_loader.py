@@ -92,5 +92,54 @@ class JobDescriptionLoader:
                 json.dump(fallback, f, indent=2)
             return fallback
 
+    async def get_structured_jd_from_file(self, file_path: str) -> Dict[str, Any]:
+        """
+        Parses job description criteria from a specific file path and caches it.
+        Supports .docx and plain text .txt files.
+        """
+        ext = file_path.split(".")[-1].lower()
+        if ext == "docx":
+            raw_text = self.extract_text_from_docx(file_path)
+        else:
+            with open(file_path, "r", encoding="utf-8") as f:
+                raw_text = f.read()
+
+        prompt = f"""
+        You are an expert AI recruiting architect. Parse this Job Description text and extract structured fields.
+        
+        You must output a single JSON object containing EXACTLY these keys:
+        1. "title": The formal job title (e.g. "Senior ML/AI Engineer - Search, Retrieval & Ranking").
+        2. "skills_required": List of technical skills the candidate MUST absolutely have.
+        3. "skills_preferred": List of nice-to-have skills.
+        4. "experience_required": Text summary of years of experience required.
+        5. "responsibilities": List of main responsibilities.
+        6. "industry": Core industry target.
+        7. "technologies": List of core technologies/databases/libraries needed.
+        8. "leadership_expectations": List of leadership expectations.
+        9. "product_mindset": Key product mindset requirements.
+        10. "must_have_skills": A list of must-have skills/qualifications.
+        11. "nice_to_have_skills": A list of nice-to-have skills/qualifications.
+
+        Ensure the output is a single valid JSON object. Do not include markdown code block formatting (like ```json ... ```) in the raw response, just return the plain JSON.
+        
+        Job Description:
+        ---
+        {raw_text}
+        ---
+        """
+        
+        print(f"Calling Gemini 2.5 Flash to extract job criteria from uploaded file: {file_path}")
+        response_text = await call_gemini_async(prompt, json_mode=True, temperature=0.1)
+        
+        try:
+            data = json.loads(response_text)
+            with open(JD_JSON_PATH, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+            print(f"Structured custom Job Description criteria cached in '{JD_JSON_PATH}'.")
+            return data
+        except Exception as e:
+            print(f"Failed to parse custom JD: {e}. Raw response: {response_text}")
+            raise ValueError(f"Failed to extract structured criteria from the uploaded Job Description: {str(e)}")
+
 # Singleton instance
 jd_loader = JobDescriptionLoader()

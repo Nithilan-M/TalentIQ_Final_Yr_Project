@@ -23,7 +23,9 @@ async function request(endpoint: string, options: RequestInit = {}) {
 
   if (response.status === 401) {
     authService.logout();
-    window.location.href = "/login";
+    if (window.location.pathname !== "/login" && window.location.pathname !== "/register") {
+      window.location.href = "/login";
+    }
     throw new Error("Session expired. Please log in again.");
   }
 
@@ -34,7 +36,13 @@ async function request(endpoint: string, options: RequestInit = {}) {
 
   // Handle file streaming downloads vs JSON
   const contentType = response.headers.get("content-type");
-  if (contentType && (contentType.includes("application/pdf") || contentType.includes("text/csv"))) {
+  if (
+    contentType &&
+    (contentType.includes("application/pdf") ||
+      contentType.includes("text/csv") ||
+      contentType.includes("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") ||
+      contentType.includes("application/octet-stream"))
+  ) {
     return response.blob();
   }
 
@@ -128,7 +136,7 @@ export const apiService = {
     return request("/challenge/run", { method: "POST" });
   },
 
-  async runChallengePipelineStream(file: File | undefined, onProgress: (update: any) => void) {
+  async runChallengePipelineStream(file: File | undefined, jdFile: File | undefined, onProgress: (update: any) => void) {
     const token = authService.getToken();
     const headers = new Headers();
     if (token) {
@@ -136,9 +144,14 @@ export const apiService = {
     }
     
     let body: any = undefined;
-    if (file) {
+    if (file || jdFile) {
       body = new FormData();
-      body.append("file", file);
+      if (file) {
+        body.append("file", file);
+      }
+      if (jdFile) {
+        body.append("jd_file", jdFile);
+      }
     }
 
     const response = await fetch(`${BASE_URL}/challenge/run`, {
@@ -193,6 +206,10 @@ export const apiService = {
 
   async getChallengeAnalytics() {
     return request("/challenge/analytics");
+  },
+
+  async exportChallengeXLSX() {
+    return request("/challenge/export-xlsx");
   }
 };
 

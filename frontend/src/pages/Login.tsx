@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Lock, Mail, ArrowRight, Briefcase, Eye, EyeOff } from "lucide-react";
 import { authService } from "../services/auth";
+import { apiService } from "../services/api";
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -18,10 +19,18 @@ export const Login: React.FC = () => {
 
     try {
       await authService.login(email, password);
-      // Check if there are any JDs. If not, direct them to upload JD first
-      navigate("/");
-      // Force page reload to sync Navbar state
-      window.location.reload();
+      // Check if this user has any JDs — redirect to upload if none
+      try {
+        const latestJd = await apiService.getLatestJobDescription();
+        if (latestJd && latestJd.id) {
+          localStorage.setItem("active_jd_id", String(latestJd.id));
+          navigate("/");
+        } else {
+          navigate("/upload-jd");
+        }
+      } catch {
+        navigate("/upload-jd");
+      }
     } catch (err: any) {
       setError(err.message || "Failed to log in. Please check your credentials.");
     } finally {

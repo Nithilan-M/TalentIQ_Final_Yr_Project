@@ -11,13 +11,11 @@ export const Register: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setSuccess(null);
 
     if (password !== confirmPassword) {
       setError("Passwords do not match.");
@@ -27,10 +25,9 @@ export const Register: React.FC = () => {
     setLoading(true);
     try {
       await authService.register(email, password);
-      setSuccess("Account created successfully! Redirecting to login...");
-      setTimeout(() => {
-        navigate("/login");
-      }, 1500);
+      // Auto-login right after registration so user goes directly to their workspace
+      await authService.login(email, password);
+      navigate("/upload-jd");
     } catch (err: any) {
       setError(err.message || "Failed to create account. Email may already be in use.");
     } finally {

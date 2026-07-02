@@ -29,27 +29,53 @@ export const Dashboard: React.FC = () => {
   const loadDashboard = async () => {
     setLoading(true);
     setError(null);
-    const savedJdId = localStorage.getItem("active_jd_id");
-    if (!savedJdId) {
-      setError("No active job description loaded. Please upload a Job Description to begin.");
-      setLoading(false);
-      return;
-    }
 
     try {
+      let savedJdId = localStorage.getItem("active_jd_id");
+
+      // If no active JD in localStorage, auto-fetch the user's latest from the backend
+      if (!savedJdId) {
+        const latestJd = await apiService.getLatestJobDescription();
+        if (latestJd && latestJd.id) {
+          savedJdId = String(latestJd.id);
+          localStorage.setItem("active_jd_id", savedJdId);
+        } else {
+          setError("No active job description found. Please upload a Job Description to begin.");
+          setLoading(false);
+          return;
+        }
+      }
+
       const jdId = Number(savedJdId);
       setActiveJdId(jdId);
-      
-      // Fetch JD details
-      const jdDetails = await apiService.getJobDescriptionDetails(jdId);
+
+      // Fetch JD details — if this 404s (belongs to another user), reset and try latest
+      let jdDetails: any;
+      try {
+        jdDetails = await apiService.getJobDescriptionDetails(jdId);
+      } catch {
+        // Stored JD ID doesn't belong to this user — reset and try their latest
+        localStorage.removeItem("active_jd_id");
+        const latestJd = await apiService.getLatestJobDescription();
+        if (latestJd && latestJd.id) {
+          localStorage.setItem("active_jd_id", String(latestJd.id));
+          jdDetails = latestJd;
+          setActiveJdId(latestJd.id);
+        } else {
+          setError("No job descriptions found for your account. Please upload one to begin.");
+          setLoading(false);
+          return;
+        }
+      }
+
       setActiveJdTitle(jdDetails.title);
 
       // Fetch Candidates list
-      const candidateList = await apiService.listCandidates(jdId);
+      const candidateList = await apiService.listCandidates(Number(jdDetails.id ?? jdId));
       setCandidates(candidateList);
 
       // Fetch Analytics summary stats
-      const analytics = await apiService.getAnalytics(jdId);
+      const analytics = await apiService.getAnalytics(Number(jdDetails.id ?? jdId));
       setStats({
         total_candidates: analytics.total_candidates,
         average_match_score: analytics.average_match_score,

@@ -1,72 +1,78 @@
 {
   "title": "Senior AI Engineer \u2014 Founding Team",
   "skills_required": [
-    "embeddings",
-    "vector databases",
-    "python",
-    "evaluation frameworks",
-    "search",
-    "retrieval",
-    "ranking",
-    "ndcg",
-    "mrr",
-    "map"
+    "Production experience with embeddings-based retrieval systems (e.g., sentence-transformers, OpenAI embeddings, BGE, E5)",
+    "Experience handling embedding drift, index refresh, retrieval-quality regression in production",
+    "Production experience with vector databases or hybrid search infrastructure (e.g., Pinecone, Weaviate, Qdrant, Milvus, OpenSearch, Elasticsearch, FAISS)",
+    "Strong Python skills with a focus on code quality",
+    "Hands-on experience designing evaluation frameworks for ranking systems (NDCG, MRR, MAP, offline-to-online correlation, A/B test interpretation)"
   ],
   "skills_preferred": [
-    "llm fine-tuning",
-    "lora",
-    "qlora",
-    "peft",
-    "learning-to-rank",
-    "xgboost",
-    "lightgbm",
-    "distributed systems",
-    "large-scale inference"
+    "LLM fine-tuning experience (LoRA, QLoRA, PEFT)",
+    "Experience with learning-to-rank models (XGBoost-based or neural)",
+    "Background in distributed systems or large-scale inference optimization",
+    "Open-source contributions in the AI/ML space"
   ],
-  "experience_required": "5-9 years of experience in product companies",
+  "experience_required": "5\u20139 years of experience, with a strong emphasis on applied ML/AI roles at product companies. Candidates must have shipped at least one end-to-end ranking, search, or recommendation system to real users at meaningful scale. Pure research or recent LangChain-only experience without prior production ML is a disqualifier. Must be actively writing production code.",
   "responsibilities": [
-    "Own the intelligence layer",
-    "Audit search algorithms",
-    "Ship v2 ranking system",
-    "Set up evaluation infrastructure",
-    "Mentor hires",
-    "System architecture decisions"
+    "Own the intelligence layer of Redrob's product, including ranking, retrieval, and matching systems.",
+    "Audit existing systems (BM25 + rule-based scoring) and identify high-leverage improvements.",
+    "Ship a v2 ranking system using embeddings, hybrid retrieval, and LLM-based re-ranking to demonstrably improve recruiter-engagement metrics.",
+    "Set up comprehensive evaluation infrastructure, including offline benchmarks, online A/B testing, and recruiter-feedback loops.",
+    "Drive the long-term architecture for candidate-JD matching at scale.",
+    "Mentor new hires as the team grows.",
+    "Collaborate closely with the recruiter-experience Product Manager on product development."
   ],
-  "industry": "HR-tech / marketplaces / talent intelligence",
+  "industry": "Talent Intelligence, HR Tech, AI/ML",
   "technologies": [
+    "Embeddings-based retrieval systems (sentence-transformers, OpenAI embeddings, BGE, E5)",
+    "Vector databases/hybrid search (Pinecone, Weaviate, Qdrant, Milvus, OpenSearch, Elasticsearch, FAISS)",
     "Python",
-    "FAISS",
-    "sentence-transformers",
-    "XGBoost",
-    "LightGBM",
-    "Scikit-Learn",
-    "Pinecone",
-    "Weaviate",
-    "Qdrant",
-    "Milvus",
-    "OpenSearch",
-    "Elasticsearch"
+    "LLMs",
+    "LoRA, QLoRA, PEFT (for fine-tuning)",
+    "XGBoost (for learning-to-rank)",
+    "Neural models (for learning-to-rank)",
+    "BM25 (current system)"
   ],
   "leadership_expectations": [
-    "Own architecture decisions",
-    "Mentor junior hires",
-    "Collaborate with PMs"
+    "Drive the long-term architecture of core product intelligence systems.",
+    "Mentor and guide junior engineers.",
+    "Formulate and defend strong opinions on retrieval, evaluation, and LLM integration based on practical experience."
   ],
   "product_mindset": [
-    "Bias toward shipping over research",
-    "Willingness to write code",
-    "Mentorship focus"
+    "Possess a scrappy product-engineering attitude, prioritizing shipping functional solutions quickly to learn from real users.",
+    "Comfortable with ambiguity and evolving requirements in a Series A startup environment.",
+    "Ability to think about product, recruiter workflows, and evaluation frameworks beyond just coding.",
+    "Bias towards shipping and iterating over pure research.",
+    "Focus on improving user-engagement metrics."
   ],
   "must_have_skills": [
-    "Python",
-    "embeddings-based retrieval systems",
-    "vector databases or hybrid search",
-    "evaluation frameworks (NDCG, MRR, MAP)"
+    "Deep technical depth in modern ML systems (embeddings, retrieval, ranking, LLMs, fine-tuning).",
+    "Production experience with embeddings-based retrieval systems deployed to real users.",
+    "Experience handling embedding drift, index refresh, and retrieval-quality regression in production.",
+    "Production experience with vector databases or hybrid search infrastructure with operational expertise.",
+    "Strong Python skills with a focus on code quality.",
+    "Hands-on experience designing evaluation frameworks for ranking systems (NDCG, MRR, MAP, offline-to-online correlation, A/B test interpretation).",
+    "Scrappy product-engineering attitude, willing to ship a working solution quickly to learn from real users.",
+    "Experience in applied ML/AI roles at product companies (not pure services).",
+    "Has shipped at least one end-to-end ranking, search, or recommendation system to real users at meaningful scale.",
+    "Strong opinions about retrieval (hybrid vs dense), evaluation (offline vs online), and LLM integration (when to fine-tune vs prompt), defensible with reference to systems actually built.",
+    "Not from pure research environments without any production deployment experience.",
+    "Not primarily focused on recent LangChain/OpenAI projects without substantial pre-LLM-era ML production experience.",
+    "Actively writing production code (not solely in architecture/tech lead roles for 18+ months).",
+    "Commitment to staying for 3+ years (not a 'title-chaser').",
+    "Focus on systems thinking, not just framework enthusiasm.",
+    "Prior product-company experience (not solely from consulting firms).",
+    "Primary expertise in NLP/IR, not computer vision, speech, or robotics.",
+    "Demonstrated external validation (papers, talks, open-source) if work has been entirely on closed-source proprietary systems for 5+ years."
   ],
   "nice_to_have_skills": [
-    "XGBoost",
-    "LightGBM",
-    "LLM fine-tuning",
-    "marketplace product exposure"
+    "LLM fine-tuning experience (LoRA, QLoRA, PEFT).",
+    "Experience with learning-to-rank models (XGBoost-based or neural).",
+    "Prior exposure to HR-tech, recruiting tech, or marketplace products.",
+    "Background in distributed systems or large-scale inference optimization.",
+    "Open-source contributions in the AI/ML space.",
+    "Located in or willing to relocate to Noida or Pune.",
+    "Active on Redrob platform or clear signal of being in the job market."
   ]
 }

@@ -36,6 +36,8 @@ export const authService = {
 
     const data = await response.json();
     if (data.access_token) {
+      // Clear any previous user's session data before setting new credentials
+      localStorage.removeItem("active_jd_id");
       localStorage.setItem("token", data.access_token);
       localStorage.setItem("user_email", data.email);
     }

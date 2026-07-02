@@ -18,6 +18,7 @@ router = APIRouter(prefix="/api/challenge", tags=["Redrob Challenge"])
 @router.post("/run")
 async def run_challenge_pipeline(
     file: UploadFile = File(None),
+    jd_file: UploadFile = File(None),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -27,24 +28,37 @@ async def run_challenge_pipeline(
     from fastapi.responses import StreamingResponse
     import shutil
 
+    temp_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "temp_uploads")
+    os.makedirs(temp_dir, exist_ok=True)
+
     temp_jsonl_path = None
     if file:
         try:
-            # Save uploaded candidates.jsonl to temp directory
-            temp_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "temp_uploads")
-            os.makedirs(temp_dir, exist_ok=True)
             temp_jsonl_path = os.path.join(temp_dir, "challenge_uploaded_candidates.jsonl")
             with open(temp_jsonl_path, "wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to save uploaded file: {str(e)}"
+                detail=f"Failed to save uploaded candidates file: {str(e)}"
+            )
+
+    temp_jd_path = None
+    if jd_file:
+        try:
+            ext = jd_file.filename.split(".")[-1].lower()
+            temp_jd_path = os.path.join(temp_dir, f"challenge_uploaded_jd.{ext}")
+            with open(temp_jd_path, "wb") as buffer:
+                shutil.copyfileobj(jd_file.file, buffer)
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to save uploaded job description file: {str(e)}"
             )
 
     async def event_generator():
         try:
-            async for update in run_offline_ranking_pipeline(input_jsonl=temp_jsonl_path):
+            async for update in run_offline_ranking_pipeline(input_jsonl=temp_jsonl_path, input_jd=temp_jd_path):
                 yield json.dumps(update) + "\n"
         except Exception as e:
             yield json.dumps({
@@ -138,4 +152,35 @@ def get_challenge_analytics(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Analytics compilation failed: {str(e)}"
+        )
+
+@router.get("/export-xlsx")
+def export_challenge_xlsx(
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Converts the generated submission CSV to Excel format (.xlsx) and returns it as a download.
+    """
+    import pandas as pd
+    from fastapi.responses import FileResponse
+    
+    if not os.path.exists(SUBMISSION_CSV_PATH):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No submission data found. Run the pipeline first."
+        )
+    
+    xlsx_path = SUBMISSION_CSV_PATH.replace(".csv", ".xlsx")
+    try:
+        df = pd.read_csv(SUBMISSION_CSV_PATH)
+        df.to_excel(xlsx_path, index=False, engine="openpyxl")
+        return FileResponse(
+            path=xlsx_path,
+            filename="participant_submission.xlsx",
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate Excel file: {str(e)}"
         )

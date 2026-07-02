@@ -9,16 +9,17 @@ load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 if not DATABASE_URL:
-    # Fallback to local SQLite if Postgres is not configured
-    DATABASE_URL = "sqlite:///./talent_iq.db"
-    connect_args = {"check_same_thread": False}
-    print(f"Database connection: SQLite fallback ({DATABASE_URL})")
-else:
-    # Ensure correct postgresql protocol for SQLAlchemy (fix postgreSQL:// to postgres:// if needed, or vice-versa)
-    if DATABASE_URL.startswith("postgres://"):
-        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-    connect_args = {}
-    print(f"Database connection: PostgreSQL database detected")
+    raise RuntimeError(
+        "DATABASE_URL is not set. "
+        "Add your Supabase PostgreSQL connection string to backend/.env before starting the server."
+    )
+
+# Normalize postgres:// → postgresql:// for SQLAlchemy compatibility
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+connect_args = {}
+print("Database connection: Supabase PostgreSQL")
 
 engine = create_engine(DATABASE_URL, connect_args=connect_args, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
