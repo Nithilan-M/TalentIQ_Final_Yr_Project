@@ -1,391 +1,332 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { 
-  Users, TrendingUp, Sparkles, Search, FileDown, 
-  GitCompare, AlertCircle, FileText, ChevronRight, Download
+import {
+  Briefcase,
+  Users,
+  Sparkles,
+  Search,
+  Filter,
+  ChevronRight,
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+  Layers,
+  Award,
+  Target,
+  FileCheck2,
+  Plus,
+  ArrowRight,
+  ShieldCheck,
+  TrendingUp,
+  FileText,
+  Loader2
 } from "lucide-react";
 import { apiService } from "../services/api";
 import { GlassCard } from "../components/GlassCard";
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-  const [activeJdId, setActiveJdId] = useState<number | null>(null);
-  const [activeJdTitle, setActiveJdTitle] = useState<string>("");
-  const [candidates, setCandidates] = useState<any[]>([]);
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [stats, setStats] = useState({
-    total_candidates: 0,
-    average_match_score: 0,
-    high_potential_count: 0
-  });
-  const [loading, setLoading] = useState(true);
+
+  const [summaryData, setSummaryData] = useState<any | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Search & Filter
+  const [search, setSearch] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("");
+
   useEffect(() => {
-    loadDashboard();
+    fetchDashboardData();
   }, []);
 
-  const loadDashboard = async () => {
+  const fetchDashboardData = async () => {
     setLoading(true);
     setError(null);
-
     try {
-      let savedJdId = localStorage.getItem("active_jd_id");
-
-      // If no active JD in localStorage, auto-fetch the user's latest from the backend
-      if (!savedJdId) {
-        const latestJd = await apiService.getLatestJobDescription();
-        if (latestJd && latestJd.id) {
-          savedJdId = String(latestJd.id);
-          localStorage.setItem("active_jd_id", savedJdId);
-        } else {
-          setError("No active job description found. Please upload a Job Description to begin.");
-          setLoading(false);
-          return;
-        }
-      }
-
-      const jdId = Number(savedJdId);
-      setActiveJdId(jdId);
-
-      // Fetch JD details — if this 404s (belongs to another user), reset and try latest
-      let jdDetails: any;
-      try {
-        jdDetails = await apiService.getJobDescriptionDetails(jdId);
-      } catch {
-        // Stored JD ID doesn't belong to this user — reset and try their latest
-        localStorage.removeItem("active_jd_id");
-        const latestJd = await apiService.getLatestJobDescription();
-        if (latestJd && latestJd.id) {
-          localStorage.setItem("active_jd_id", String(latestJd.id));
-          jdDetails = latestJd;
-          setActiveJdId(latestJd.id);
-        } else {
-          setError("No job descriptions found for your account. Please upload one to begin.");
-          setLoading(false);
-          return;
-        }
-      }
-
-      setActiveJdTitle(jdDetails.title);
-
-      // Fetch Candidates list
-      const candidateList = await apiService.listCandidates(Number(jdDetails.id ?? jdId));
-      setCandidates(candidateList);
-
-      // Fetch Analytics summary stats
-      const analytics = await apiService.getAnalytics(Number(jdDetails.id ?? jdId));
-      setStats({
-        total_candidates: analytics.total_candidates,
-        average_match_score: analytics.average_match_score,
-        high_potential_count: analytics.high_potential_count
-      });
+      const data = await apiService.getDashboardSummary();
+      setSummaryData(data);
     } catch (err: any) {
       console.error(err);
-      setError(err.message || "Failed to load dashboard data. Ensure backend is running.");
+      setError(err.message || "Failed to load Project Manager Dashboard summary.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activeJdId) return;
-    setLoading(true);
-    try {
-      const results = await apiService.listCandidates(activeJdId, searchQuery);
-      setCandidates(results);
-    } catch (err) {
-      console.error("Semantic search failed:", err);
-    } finally {
-      setLoading(false);
+  const getStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case "READY_FOR_ASSESSMENT":
+      case "SHORTLISTED":
+        return "bg-emerald-50 text-emerald-700 border-emerald-300";
+      case "RANKING_COMPLETED":
+        return "bg-amber-50 text-amber-700 border-amber-300";
+      case "MATCHING_COMPLETED":
+        return "bg-purple-50 text-purple-700 border-purple-300";
+      case "AVAILABILITY_COMPLETED":
+        return "bg-blue-50 text-blue-700 border-blue-300";
+      case "REQUIREMENT_REVIEWED":
+      case "REQUIREMENT_EXTRACTED":
+        return "bg-indigo-50 text-indigo-700 border-indigo-300";
+      default:
+        return "bg-slate-100 text-slate-600 border-slate-200";
     }
   };
 
-  const toggleSelectCandidate = (id: number) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    );
-  };
-
-  const handleCompare = () => {
-    if (selectedIds.length < 2) return;
-    navigate(`/compare?ids=${selectedIds.join(",")}`);
-  };
-
-  const handleExportCSV = async () => {
-    if (!activeJdId) return;
-    try {
-      const blob = await apiService.exportCandidatesCSV(activeJdId);
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", `Candidates_Rankings_${activeJdTitle.replace(/\s+/g, "_")}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    } catch (err) {
-      console.error(err);
-      alert("Failed to export candidates listing CSV.");
+  const filteredProjects = (summaryData?.recent_projects || []).filter((p: any) => {
+    if (statusFilter && p.status !== statusFilter) return false;
+    if (search.trim()) {
+      const s = search.trim().toLowerCase();
+      const title = (p.project_name || p.title || "").toLowerCase();
+      const domain = (p.domain || "").toLowerCase();
+      const idStr = String(p.id);
+      if (!title.includes(s) && !domain.includes(s) && !idStr.includes(s)) return false;
     }
-  };
-
-  const handleDownloadPDF = async (candidateId: number, name: string) => {
-    try {
-      const blob = await apiService.exportCandidatePDF(candidateId);
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", `Candidate_Dossier_${name.replace(/\s+/g, "_")}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    } catch (err) {
-      console.error(err);
-      alert("Failed to export candidate dossier PDF.");
-    }
-  };
-
-  if (loading && candidates.length === 0) {
-    return (
-      <div className="flex h-[calc(100vh-4rem)] items-center justify-center dark:bg-slate-950">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" />
-          <p className="text-sm font-semibold text-slate-500">Accessing Recruiter Dashboard...</p>
-        </div>
-      </div>
-    );
-  }
+    return true;
+  });
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      {/* Top Banner */}
-      <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      {/* PAGE HEADER */}
+      <div className="mb-6 border-b border-slate-200 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Recruiter Dashboard
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2.5">
+            <Briefcase className="h-6 w-6 text-blue-600" />
+            Project Manager Dashboard
           </h1>
-          {activeJdTitle ? (
-            <p className="mt-1 text-sm text-slate-500">
-              Active Job Description: <span className="font-semibold text-red-500">{activeJdTitle}</span>
-            </p>
-          ) : (
-            <p className="mt-1 text-sm text-red-500 font-semibold flex items-center gap-1">
-              <AlertCircle className="h-4 w-4" />
-              Upload a Job Description to get started!
-            </p>
-          )}
+          <p className="mt-1 text-xs text-slate-500">
+            Centralized orchestration workspace for AI-Based Workforce Skill Matching & Project Staffing.
+          </p>
         </div>
 
-        {activeJdTitle && (
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={handleExportCSV}
-              className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-all cursor-pointer"
-            >
-              <FileDown className="h-4 w-4 text-slate-400" />
-              <span>Export CSV</span>
-            </button>
-            <button
-              onClick={() => navigate("/upload-resume")}
-              className="flex items-center gap-1.5 rounded-lg bg-red-500 px-3.5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-red-600 transition-all cursor-pointer"
-            >
-              <span>+ Parse Resumes</span>
-            </button>
-          </div>
-        )}
-      </div>
-
-      {error && (
-        <GlassCard className="border-red-100 bg-red-50/50 p-8 mb-6 text-center">
-          <AlertCircle className="mx-auto h-10 w-10 text-red-500 mb-3" />
-          <h3 className="text-lg font-bold text-slate-900 mb-1">No Active Context</h3>
-          <p className="text-slate-500 mb-6 max-w-sm mx-auto text-sm">{error}</p>
+        <div className="flex items-center gap-3">
           <button
             onClick={() => navigate("/upload-jd")}
-            className="rounded-lg bg-red-500 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-red-600 cursor-pointer"
+            className="flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 px-4 py-2 text-xs font-bold text-white shadow-sm cursor-pointer transition-all"
           >
-            Create Job Description
+            <Plus className="h-4 w-4" />
+            <span>Create Project / Upload Requirement</span>
           </button>
-        </GlassCard>
+        </div>
+      </div>
+
+      {/* ERROR BANNER */}
+      {error && (
+        <div className="p-4 mb-6 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-medium flex items-center gap-3">
+          <AlertCircle className="h-5 w-5 text-red-500 shrink-0" />
+          <div>{error}</div>
+        </div>
       )}
 
-      {activeJdTitle && (
-        <>
-          {/* Dashboard Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <GlassCard className="flex items-center gap-4 p-5">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-600 bg-slate-50">
-                <Users className="h-5 w-5" />
-              </div>
-              <div>
-                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total Candidates</span>
-                <h3 className="text-2xl font-bold text-slate-900 mt-0.5">{stats.total_candidates}</h3>
-              </div>
-            </GlassCard>
+      {/* GLOBAL SUMMARY CARDS */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+        <GlassCard className="p-4 border-l-4 border-l-blue-600">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-blue-600">Total Projects</div>
+          <div className="mt-1 text-2xl font-extrabold text-slate-900">
+            {loading ? <Loader2 className="h-5 w-5 animate-spin text-blue-600" /> : summaryData?.total_projects || 0}
+          </div>
+          <div className="text-[11px] text-slate-400 mt-1">Project Requirements</div>
+        </GlassCard>
 
-            <GlassCard className="flex items-center gap-4 p-5">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-600 bg-slate-50">
-                <TrendingUp className="h-5 w-5" />
-              </div>
-              <div>
-                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Average Match score</span>
-                <h3 className="text-2xl font-bold text-slate-900 mt-0.5">{stats.average_match_score}%</h3>
-              </div>
-            </GlassCard>
+        <GlassCard className="p-4 border-l-4 border-l-indigo-600">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-indigo-600">Active Staffing</div>
+          <div className="mt-1 text-2xl font-extrabold text-indigo-900">
+            {loading ? <Loader2 className="h-5 w-5 animate-spin text-indigo-600" /> : summaryData?.active_projects || 0}
+          </div>
+          <div className="text-[11px] text-indigo-600 font-medium mt-1">In active workflow</div>
+        </GlassCard>
 
-            <GlassCard className="flex items-center gap-4 p-5">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-600 bg-slate-50">
-                <Sparkles className="h-5 w-5" />
-              </div>
+        <GlassCard className="p-4 border-l-4 border-l-emerald-500">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-600">Total Workforce</div>
+          <div className="mt-1 text-2xl font-extrabold text-emerald-800">
+            {loading ? <Loader2 className="h-5 w-5 animate-spin text-emerald-600" /> : summaryData?.workforce?.total_employees || 0}
+          </div>
+          <div className="text-[11px] text-emerald-600 font-medium mt-1">
+            {summaryData?.workforce?.active_employees || 0} Active Employees
+          </div>
+        </GlassCard>
+
+        <GlassCard className="p-4 border-l-4 border-l-purple-600">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-purple-600">Skill Taxonomy</div>
+          <div className="mt-1 text-2xl font-extrabold text-purple-900">
+            {loading ? <Loader2 className="h-5 w-5 animate-spin text-purple-600" /> : summaryData?.taxonomy?.total_skills || 0}
+          </div>
+          <div className="text-[11px] text-purple-600 font-medium mt-1">Canonical skills catalog</div>
+        </GlassCard>
+
+        <GlassCard className="p-4 border-l-4 border-l-amber-500">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-amber-600">Ready for Assessment</div>
+          <div className="mt-1 text-2xl font-extrabold text-amber-900">
+            {loading ? <Loader2 className="h-5 w-5 animate-spin text-amber-600" /> : summaryData?.projects_ready_for_assessment || 0}
+          </div>
+          <div className="text-[11px] text-amber-600 font-medium mt-1">2× Shortlists generated</div>
+        </GlassCard>
+      </div>
+
+      {/* QUICK WORKFORCE & TAXONOMY SUMMARY BANNER */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        <GlassCard className="p-5 border-blue-200 bg-blue-50/20 flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <Users className="h-6 w-6 text-blue-600" />
               <div>
-                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">High Potential</span>
-                <h3 className="text-2xl font-bold text-slate-900 mt-0.5">{stats.high_potential_count}</h3>
+                <h3 className="text-sm font-bold text-slate-900">Employee Master Data</h3>
+                <p className="text-xs text-slate-500">Centralized workforce repository containing profiles, skills, and history.</p>
               </div>
-            </GlassCard>
+            </div>
+            <span className="px-2.5 py-1 bg-blue-100 text-blue-800 text-[11px] font-extrabold rounded-full">
+              {summaryData?.workforce?.total_employees || 0} Employees
+            </span>
           </div>
 
-          {/* Semantic Search Bar */}
-          <GlassCard className="mb-6 p-4">
-            <form onSubmit={handleSearch} className="flex gap-2">
-              <div className="relative flex-1">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-                  <Search className="h-4 w-4" />
-                </span>
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder='Search candidates semantically, e.g. "React developer who knows FastAPI and Docker"'
-                  className="h-10 w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm outline-none transition-all focus:border-red-500 focus:ring-1 focus:ring-red-500 text-slate-900 placeholder:text-slate-400"
-                />
-              </div>
-              <button
-                type="submit"
-                className="h-10 rounded-lg bg-red-500 px-5 text-sm font-medium text-white shadow-sm hover:bg-red-600 transition-all cursor-pointer"
-              >
-                Search
-              </button>
-            </form>
-          </GlassCard>
+          <div className="mt-4 flex items-center justify-between border-t border-blue-100 pt-3">
+            <div className="flex items-center gap-4 text-xs font-semibold text-slate-700">
+              <span>Active: <strong className="text-emerald-700">{summaryData?.workforce?.active_employees || 0}</strong></span>
+              <span>Inactive: <strong className="text-slate-500">{summaryData?.workforce?.inactive_employees || 0}</strong></span>
+            </div>
+            <button
+              onClick={() => navigate("/employees")}
+              className="flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 cursor-pointer"
+            >
+              <span>Manage Employees</span>
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </GlassCard>
 
-          {/* Candidates Table List */}
-          <GlassCard className="overflow-hidden p-0">
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5 gap-4">
-              <h3 className="text-base font-semibold text-slate-900">
-                Candidate Evaluation List
-              </h3>
-              
-              {selectedIds.length >= 2 && (
-                <button
-                  onClick={handleCompare}
-                  className="flex items-center gap-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-all cursor-pointer"
-                >
-                  <GitCompare className="h-3.5 w-3.5" />
-                  <span>Compare Candidates ({selectedIds.length})</span>
-                </button>
-              )}
+        <GlassCard className="p-5 border-purple-200 bg-purple-50/20 flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <Layers className="h-6 w-6 text-purple-600" />
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Skill Taxonomy & Proficiency</h3>
+                <p className="text-xs text-slate-500">Standardized skill dictionary with numeric levels (1–4).</p>
+              </div>
+            </div>
+            <span className="px-2.5 py-1 bg-purple-100 text-purple-800 text-[11px] font-extrabold rounded-full">
+              {summaryData?.taxonomy?.total_skills || 0} Standard Skills
+            </span>
+          </div>
+
+          <div className="mt-4 flex items-center justify-between border-t border-purple-100 pt-3">
+            <div className="text-xs font-semibold text-slate-700">
+              Levels: Beginner (1) &bull; Intermediate (2) &bull; Advanced (3) &bull; Expert (4)
+            </div>
+            <button
+              onClick={() => navigate("/skills")}
+              className="flex items-center gap-1 text-xs font-bold text-purple-600 hover:text-purple-800 cursor-pointer"
+            >
+              <span>Manage Taxonomy</span>
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </GlassCard>
+      </div>
+
+      {/* RECENT PROJECTS & WORKFLOW WORKSPACE TABLE */}
+      <GlassCard className="p-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+          <div>
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <Briefcase className="h-5 w-5 text-blue-600" />
+              Project Staffing Workspaces
+            </h3>
+            <p className="text-xs text-slate-500">Select a project to open its dedicated workflow workspace.</p>
+          </div>
+
+          {/* Search & Status Filter */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search Project Name, ID, Domain..."
+                className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 py-1.5 text-xs font-medium text-slate-900 outline-none focus:border-blue-500"
+              />
             </div>
 
-            {candidates.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-slate-400">
-                <FileText className="h-10 w-10 text-slate-300 mb-2" />
-                <p className="text-xs">No candidates processed yet. Upload resumes to generate rankings!</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-slate-500">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50/75">
-                      <th className="py-3 px-3 text-center w-[40px]">
-                        <span className="sr-only">Select</span>
-                      </th>
-                      <th className="py-3 px-4">Name</th>
-                      <th className="py-3 px-4 text-center">Score</th>
-                      <th className="py-3 px-4 text-center">AI Decision</th>
-                      {candidates[0]?.similarity_score !== undefined && (
-                        <th className="py-3 px-4 text-center">Search Match</th>
-                      )}
-                      <th className="py-3 px-4">Top Skills</th>
-                      <th className="py-3 px-4 text-right pr-6">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {candidates.map((c) => {
-                      const decColors: Record<string, string> = {
-                        "Strong Hire": "bg-emerald-50 text-emerald-700 border-emerald-200",
-                        "Hire": "bg-blue-50 text-blue-700 border-blue-200",
-                        "Borderline": "bg-amber-50 text-amber-700 border-amber-200",
-                        "No Hire": "bg-rose-50 text-rose-700 border-rose-200"
-                      };
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 outline-none focus:border-blue-500"
+            >
+              <option value="">All Statuses</option>
+              <option value="DRAFT">Draft</option>
+              <option value="REQUIREMENT_EXTRACTED">Extracted</option>
+              <option value="REQUIREMENT_REVIEWED">Confirmed</option>
+              <option value="AVAILABILITY_COMPLETED">Availability Done</option>
+              <option value="MATCHING_COMPLETED">Matching Done</option>
+              <option value="RANKING_COMPLETED">Ranking Done</option>
+              <option value="READY_FOR_ASSESSMENT">Ready for Assessment</option>
+            </select>
+          </div>
+        </div>
 
-                      return (
-                        <tr key={c.id} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="py-3.5 px-3 text-center">
-                            <input
-                              type="checkbox"
-                              checked={selectedIds.includes(c.id)}
-                              onChange={() => toggleSelectCandidate(c.id)}
-                              className="h-4 w-4 rounded border-slate-300 text-red-500 focus:ring-red-500 cursor-pointer"
-                            />
-                          </td>
-                          <td className="py-3.5 px-4 font-semibold text-slate-900">
-                            {c.name}
-                            <span className="block text-xs font-normal text-slate-500 mt-0.5">{c.email}</span>
-                          </td>
-                          <td className="py-3.5 px-4 text-center font-bold text-red-500 text-base">
-                            {c.overall_score}%
-                          </td>
-                          <td className="py-3.5 px-4 text-center font-medium">
-                            <span className={`px-2.5 py-1 rounded-md text-[11px] font-medium border ${decColors[c.decision] || "bg-slate-50 text-slate-600 border-slate-200"}`}>
-                              {c.decision}
-                            </span>
-                          </td>
-                          {c.similarity_score !== undefined && (
-                            <td className="py-3.5 px-4 text-center font-semibold text-slate-600">
-                              {c.similarity_score > 0 ? `${(c.similarity_score * 100).toFixed(0)}%` : "0%"}
-                            </td>
-                          )}
-                          <td className="py-3.5 px-4">
-                            <div className="flex flex-wrap gap-1 max-w-[220px]">
-                              {c.skills.slice(0, 4).map((skill: string, i: number) => (
-                                <span key={i} className="text-[10px] font-medium px-2 py-0.5 rounded border border-slate-200 bg-slate-50 text-slate-600">
-                                  {skill}
-                                </span>
-                              ))}
-                              {c.skills.length > 4 && (
-                                <span className="text-[9px] font-bold text-slate-400 pl-1 align-middle">+{c.skills.length - 4}</span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="py-3.5 px-4 text-right pr-6">
-                            <div className="flex items-center justify-end gap-1.5">
-                              <button
-                                onClick={() => handleDownloadPDF(c.id, c.name)}
-                                className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-slate-400 hover:text-slate-600 transition-colors"
-                              >
-                                <Download className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={() => navigate(`/candidate/${c.id}`)}
-                                className="flex items-center gap-1 rounded-md border border-slate-200 bg-white hover:bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-all"
-                              >
-                                <span>Details</span>
-                                <ChevronRight className="h-3 w-3" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </GlassCard>
-        </>
-      )}
+        {/* PROJECTS TABLE */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-semibold text-[10px]">
+                <th className="py-3 px-4">Project ID & Name</th>
+                <th className="py-3 px-4">Domain</th>
+                <th className="py-3 px-4 text-center">Team Size (N)</th>
+                <th className="py-3 px-4 text-center">Target Shortlist (2N)</th>
+                <th className="py-3 px-4 text-center">Status</th>
+                <th className="py-3 px-4 text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="py-12 text-center text-slate-400">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-blue-600" />
+                    <span>Loading Project Workspaces...</span>
+                  </td>
+                </tr>
+              ) : filteredProjects.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-12 text-center text-slate-400 italic">
+                    No project requirements found matching specified filter criteria.
+                  </td>
+                </tr>
+              ) : (
+                filteredProjects.map((p: any) => (
+                  <tr key={p.id} className="hover:bg-slate-50/60 transition-colors">
+                    <td className="py-3.5 px-4">
+                      <div className="font-bold text-slate-900">{p.project_name || p.title}</div>
+                      <div className="text-[11px] font-mono text-slate-400">PROJ-{p.id}</div>
+                    </td>
+                    <td className="py-3.5 px-4 font-semibold text-slate-700">
+                      {p.domain}
+                    </td>
+                    <td className="py-3.5 px-4 text-center font-bold text-slate-900">
+                      {p.required_team_size} Employees
+                    </td>
+                    <td className="py-3.5 px-4 text-center font-bold text-purple-700">
+                      {p.target_shortlist} Candidates
+                    </td>
+                    <td className="py-3.5 px-4 text-center">
+                      <span className={`px-2.5 py-1 rounded-full text-[11px] font-extrabold border ${getStatusBadgeClass(p.status)}`}>
+                        {p.status}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4 text-center">
+                      <button
+                        onClick={() => navigate(`/project/${p.id}`)}
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-2xs transition-colors cursor-pointer flex items-center gap-1 mx-auto"
+                      >
+                        <span>Open Workspace</span>
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </GlassCard>
     </div>
   );
 };

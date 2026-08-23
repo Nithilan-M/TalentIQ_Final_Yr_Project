@@ -23,15 +23,25 @@ export const authService = {
     formData.append("username", email);
     formData.append("password", password);
 
-    const response = await fetch(`${API_URL}/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formData.toString(),
-    });
+    let response;
+    try {
+      response = await fetch(`${API_URL}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: formData.toString(),
+      });
+    } catch (netErr: any) {
+      console.error("Network login error:", netErr);
+      throw new Error("Unable to connect to backend server. Please verify backend (http://127.0.0.1:8000) is running.");
+    }
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || "Authentication failed.");
+      let errorDetail = "Authentication failed.";
+      try {
+        const errorData = await response.json();
+        errorDetail = errorData.detail || errorDetail;
+      } catch {}
+      throw new Error(errorDetail);
     }
 
     const data = await response.json();

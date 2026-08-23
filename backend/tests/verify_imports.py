@@ -11,7 +11,7 @@ print(f"Workspace root injected: {workspace_root}")
 
 # 1. Test standard ML & parsing libraries
 try:
-    import fitz
+    import pymupdf as fitz
     print("[Success] PyMuPDF (fitz) imported successfully")
 except Exception as e:
     print(f"[Failure] PyMuPDF import failed: {e}")

@@ -50,14 +50,26 @@ async function request(endpoint: string, options: RequestInit = {}) {
 }
 
 export const apiService = {
-  // Job Descriptions
-  async uploadJobDescription(file: File) {
+  // Project Requirements
+  async uploadProjectRequirement(file: File) {
     const formData = new FormData();
     formData.append("file", file);
     return request("/job-description/upload", {
       method: "POST",
       body: formData,
     });
+  },
+
+  async confirmProjectRequirement(data: any) {
+    return request("/job-description/confirm", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  // Legacy Job Descriptions aliases
+  async uploadJobDescription(file: File) {
+    return this.uploadProjectRequirement(file);
   },
 
   async getLatestJobDescription() {
@@ -72,7 +84,295 @@ export const apiService = {
     return request(`/job-description/${id}`);
   },
 
-  // Resumes / Candidates
+  // ── Skill Taxonomy APIs ───────────────────────────────────────────────
+
+  async listSkills(params: {
+    page?: number;
+    page_size?: number;
+    search?: string;
+    category?: string;
+    status?: string;
+  } = {}) {
+    const queryParts: string[] = [];
+    if (params.page) queryParts.push(`page=${params.page}`);
+    if (params.page_size) queryParts.push(`page_size=${params.page_size}`);
+    if (params.search) queryParts.push(`search=${encodeURIComponent(params.search)}`);
+    if (params.category) queryParts.push(`category=${encodeURIComponent(params.category)}`);
+    if (params.status) queryParts.push(`status=${encodeURIComponent(params.status)}`);
+
+    const queryString = queryParts.length > 0 ? `?${queryParts.join("&")}` : "";
+    return request(`/skills${queryString}`);
+  },
+
+  async searchSkills(q: string) {
+    return request(`/skills/search?q=${encodeURIComponent(q)}`);
+  },
+
+  async getSkillCategories() {
+    return request("/skills/categories");
+  },
+
+  async getProficiencyLevels() {
+    return request("/skills/proficiency-levels");
+  },
+
+  async getSkillDetails(id: number) {
+    return request(`/skills/${id}`);
+  },
+
+  async createSkill(data: any) {
+    return request("/skills", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateSkill(id: number, data: any) {
+    return request(`/skills/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deactivateSkill(id: number) {
+    return request(`/skills/${id}`, {
+      method: "DELETE",
+    });
+  },
+
+  // ── Employee Availability Engine APIs ──────────────────────────────────
+
+  async getProjectAvailability(projectId: number, params: {
+    page?: number;
+    page_size?: number;
+    status?: string;
+    department?: string;
+    designation?: string;
+    search?: string;
+  } = {}) {
+    const queryParts: string[] = [];
+    if (params.page) queryParts.push(`page=${params.page}`);
+    if (params.page_size) queryParts.push(`page_size=${params.page_size}`);
+    if (params.status) queryParts.push(`status=${encodeURIComponent(params.status)}`);
+    if (params.department) queryParts.push(`department=${encodeURIComponent(params.department)}`);
+    if (params.designation) queryParts.push(`designation=${encodeURIComponent(params.designation)}`);
+    if (params.search) queryParts.push(`search=${encodeURIComponent(params.search)}`);
+
+    const queryString = queryParts.length > 0 ? `?${queryParts.join("&")}` : "";
+    return request(`/availability/project/${projectId}${queryString}`);
+  },
+
+  async checkDatesAvailability(startDate: string, endDate: string, params: {
+    projectName?: string;
+    page?: number;
+    page_size?: number;
+    status?: string;
+    department?: string;
+    designation?: string;
+    search?: string;
+  } = {}) {
+    const queryParts: string[] = [
+      `start_date=${encodeURIComponent(startDate)}`,
+      `end_date=${encodeURIComponent(endDate)}`
+    ];
+    if (params.projectName) queryParts.push(`project_name=${encodeURIComponent(params.projectName)}`);
+    if (params.page) queryParts.push(`page=${params.page}`);
+    if (params.page_size) queryParts.push(`page_size=${params.page_size}`);
+    if (params.status) queryParts.push(`status=${encodeURIComponent(params.status)}`);
+    if (params.department) queryParts.push(`department=${encodeURIComponent(params.department)}`);
+    if (params.designation) queryParts.push(`designation=${encodeURIComponent(params.designation)}`);
+    if (params.search) queryParts.push(`search=${encodeURIComponent(params.search)}`);
+
+    return request(`/availability/check-dates?${queryParts.join("&")}`);
+  },
+
+  async getAvailabilityFilterOptions() {
+    return request("/availability/departments");
+  },
+
+  // ── Employee-Project Skill Matching Engine APIs ────────────────────────
+
+  async getProjectSkillMatches(projectId: number, params: {
+    page?: number;
+    page_size?: number;
+    department?: string;
+    designation?: string;
+    min_score?: number;
+    search?: string;
+  } = {}) {
+    const queryParts: string[] = [];
+    if (params.page) queryParts.push(`page=${params.page}`);
+    if (params.page_size) queryParts.push(`page_size=${params.page_size}`);
+    if (params.department) queryParts.push(`department=${encodeURIComponent(params.department)}`);
+    if (params.designation) queryParts.push(`designation=${encodeURIComponent(params.designation)}`);
+    if (params.min_score !== undefined) queryParts.push(`min_score=${params.min_score}`);
+    if (params.search) queryParts.push(`search=${encodeURIComponent(params.search)}`);
+
+    const queryString = queryParts.length > 0 ? `?${queryParts.join("&")}` : "";
+    return request(`/project/${projectId}/skill-matches${queryString}`);
+  },
+
+  async getEmployeeMatchDetails(projectId: number, employeeId: number) {
+    return request(`/project/${projectId}/skill-matches/${employeeId}`);
+  },
+
+  async getMatchExplanation(projectId: number, employeeId: number) {
+    return request(`/project/${projectId}/employees/${employeeId}/match-explanation`);
+  },
+
+  // ── Employee Ranking Engine APIs ───────────────────────────────────────
+
+  async getProjectEmployeeRankings(projectId: number, params: {
+    page?: number;
+    page_size?: number;
+    department?: string;
+    designation?: string;
+    min_score?: number;
+    search?: string;
+    mode?: "PRE_ASSESSMENT" | "FINAL";
+  } = {}) {
+    const queryParts: string[] = [];
+    if (params.page) queryParts.push(`page=${params.page}`);
+    if (params.page_size) queryParts.push(`page_size=${params.page_size}`);
+    if (params.department) queryParts.push(`department=${encodeURIComponent(params.department)}`);
+    if (params.designation) queryParts.push(`designation=${encodeURIComponent(params.designation)}`);
+    if (params.min_score !== undefined) queryParts.push(`min_score=${params.min_score}`);
+    if (params.search) queryParts.push(`search=${encodeURIComponent(params.search)}`);
+    if (params.mode) queryParts.push(`mode=${encodeURIComponent(params.mode)}`);
+
+    const queryString = queryParts.length > 0 ? `?${queryParts.join("&")}` : "";
+    return request(`/project/${projectId}/ranking${queryString}`);
+  },
+
+  async getRankingConfig(projectId: number) {
+    return request(`/project/${projectId}/ranking/config`);
+  },
+
+  async getEmployeeRankingDetails(projectId: number, employeeId: number, mode: string = "PRE_ASSESSMENT") {
+    return request(`/project/${projectId}/ranking/${employeeId}?mode=${encodeURIComponent(mode)}`);
+  },
+
+  // ── 2x Shortlisting Module APIs ────────────────────────────────────────
+
+  async generateProjectShortlist(projectId: number) {
+    return request(`/project/${projectId}/shortlist/generate`, {
+      method: "POST"
+    });
+  },
+
+  async getProjectShortlist(projectId: number, params: {
+    page?: number;
+    page_size?: number;
+    status_filter?: "SHORTLISTED" | "NOT_SHORTLISTED";
+    department?: string;
+    designation?: string;
+    search?: string;
+  } = {}) {
+    const queryParts: string[] = [];
+    if (params.page) queryParts.push(`page=${params.page}`);
+    if (params.page_size) queryParts.push(`page_size=${params.page_size}`);
+    if (params.status_filter) queryParts.push(`status_filter=${encodeURIComponent(params.status_filter)}`);
+    if (params.department) queryParts.push(`department=${encodeURIComponent(params.department)}`);
+    if (params.designation) queryParts.push(`designation=${encodeURIComponent(params.designation)}`);
+    if (params.search) queryParts.push(`search=${encodeURIComponent(params.search)}`);
+
+    const queryString = queryParts.length > 0 ? `?${queryParts.join("&")}` : "";
+    return request(`/project/${projectId}/shortlist${queryString}`);
+  },
+
+  // ── Project Manager Dashboard APIs ────────────────────────────────────
+
+  async getDashboardSummary() {
+    return request("/dashboard/summary");
+  },
+
+  async getProjectDashboardWorkspace(projectId: number) {
+    return request(`/dashboard/project/${projectId}`);
+  },
+
+  // ── Employee Master Data APIs ─────────────────────────────────────────
+
+  async listEmployees(params: {
+    page?: number;
+    page_size?: number;
+    search?: string;
+    department?: string;
+    designation?: string;
+    status?: string;
+  } = {}) {
+    const queryParts: string[] = [];
+    if (params.page) queryParts.push(`page=${params.page}`);
+    if (params.page_size) queryParts.push(`page_size=${params.page_size}`);
+    if (params.search) queryParts.push(`search=${encodeURIComponent(params.search)}`);
+    if (params.department) queryParts.push(`department=${encodeURIComponent(params.department)}`);
+    if (params.designation) queryParts.push(`designation=${encodeURIComponent(params.designation)}`);
+    if (params.status) queryParts.push(`status=${encodeURIComponent(params.status)}`);
+
+    const queryString = queryParts.length > 0 ? `?${queryParts.join("&")}` : "";
+    return request(`/employee/list${queryString}`);
+  },
+
+  async getEmployeeStats() {
+    return request("/employee/stats");
+  },
+
+  async getEmployeeDetails(id: number | string) {
+    return request(`/employee/${id}`);
+  },
+
+  async createEmployee(data: any) {
+    return request("/employee", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateEmployee(id: number, data: any) {
+    return request(`/employee/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deactivateEmployee(id: number) {
+    return request(`/employee/${id}`, {
+      method: "DELETE",
+    });
+  },
+
+  async importEmployeeResume(file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+    return request("/employee/import-resume", {
+      method: "POST",
+      body: formData,
+    });
+  },
+
+  async downloadExcelTemplate() {
+    return request("/employee/excel-template");
+  },
+
+  async importExcel(file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+    return request("/employee/import-excel", {
+      method: "POST",
+      body: formData,
+    });
+  },
+
+  async confirmExcelImport(validData: any, updateExisting: boolean = true) {
+    return request("/employee/import-excel/confirm", {
+      method: "POST",
+      body: JSON.stringify({
+        valid_data: validData,
+        update_existing: updateExisting,
+      }),
+    });
+  },
+
+  // Resumes / Candidates (Legacy compatibility)
   async uploadResumes(jobDescriptionId: number, files: File[]) {
     const formData = new FormData();
     formData.append("job_description_id", String(jobDescriptionId));
@@ -180,7 +480,6 @@ export const apiService = {
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n");
       
-      // Save the last partial line back to the buffer
       buffer = lines.pop() || "";
 
       for (const line of lines) {
@@ -212,4 +511,3 @@ export const apiService = {
     return request("/challenge/export-xlsx");
   }
 };
-

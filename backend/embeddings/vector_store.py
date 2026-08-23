@@ -55,33 +55,7 @@ class VectorStoreManager:
                 embedding = self.model.encode(text, normalize_embeddings=True)
                 return embedding.tolist()
             except Exception as e:
-                print(f"Local embedding failed: {e}. Trying Gemini API...")
-
-        # Fallback: Gemini Embedding API
-        gemini_api_key = os.getenv("GEMINI_API_KEY")
-        if gemini_api_key:
-            try:
-                # Call Gemini embedding API
-                # https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={gemini_api_key}"
-                headers = {"Content-Type": "application/json"}
-                data = {
-                    "model": "models/text-embedding-004",
-                    "content": {
-                        "parts": [{"text": text}]
-                    }
-                }
-                response = httpx.post(url, headers=headers, json=data, timeout=15.0)
-                if response.status_code == 200:
-                    result = response.json()
-                    embedding = result["embedding"]["values"]
-                    # Adjust dimension dynamically if it is different
-                    self.dimension = len(embedding)
-                    return embedding
-                else:
-                    print(f"Gemini embedding API error: {response.text}")
-            except Exception as e:
-                print(f"Gemini embedding fallback failed: {e}")
+                print(f"Local embedding error: {e}")
 
         # Fallback 2: Deterministic pseudo-embedding (TF-IDF mock) if completely offline/no-keys
         # Return a simple normalized vector based on character frequencies to avoid total crash

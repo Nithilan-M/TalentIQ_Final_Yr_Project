@@ -60,7 +60,7 @@ class JobDescriptionLoader:
         ---
         """
         
-        print("Calling Gemini 2.5 Flash to extract job criteria...")
+        print("Calling local Ollama + Ornith 9b to extract job criteria...")
         response_text = await call_gemini_async(prompt, json_mode=True, temperature=0.1)
         
         try:
@@ -128,7 +128,7 @@ class JobDescriptionLoader:
         ---
         """
         
-        print(f"Calling Gemini 2.5 Flash to extract job criteria from uploaded file: {file_path}")
+        print(f"Calling local Ollama + Ornith 9b to extract job criteria from uploaded file: {file_path}")
         response_text = await call_gemini_async(prompt, json_mode=True, temperature=0.1)
         
         try:
