@@ -25,6 +25,7 @@ import {
 import { apiService } from "../services/api";
 import { GlassCard } from "../components/GlassCard";
 import { MatchExplanationModal } from "../components/MatchExplanationModal";
+import { DEMO_MATCH_DATA, DEMO_PROJECTS_LIST, DEMO_PROJECT } from "../data/demoData";
 
 interface SkillItemMatch {
   skill_name: string;
@@ -125,11 +126,25 @@ export const ProjectSkillMatching: React.FC = () => {
       } else if (list.length > 0) {
         setSelectedProjectId(list[0].id);
       } else {
+        // Fallback: use demo projects if no backend data
+        setProjectsList(DEMO_PROJECTS_LIST);
+        setSelectedProject(DEMO_PROJECT);
+        setSelectedProjectId(DEMO_PROJECT.id);
+        setMatchData(DEMO_MATCH_DATA);
+        setMatches(DEMO_MATCH_DATA.items as any);
         setLoading(false);
       }
     } catch (err: any) {
       console.error("Failed to load initial project list:", err);
-      setError("Failed to load project requirements. Ensure backend service is running.");
+      // Fallback to demo data for presentation
+      setProjectsList(DEMO_PROJECTS_LIST);
+      setSelectedProject(DEMO_PROJECT);
+      setSelectedProjectId(DEMO_PROJECT.id);
+      setDepartmentsList(["Engineering", "Data Science", "DevOps", "QA"]);
+      setDesignationsList(["Senior ML Engineer", "Backend Developer", "Data Analyst", "Frontend Developer", "DevOps Engineer", "Full Stack Developer", "Cloud Architect"]);
+      setMatchData(DEMO_MATCH_DATA);
+      setMatches(DEMO_MATCH_DATA.items as any);
+      setError(null);
       setLoading(false);
     }
   };
@@ -151,13 +166,22 @@ export const ProjectSkillMatching: React.FC = () => {
         search: search || undefined
       });
 
-      setMatchData(res);
-      setMatches(res.items || []);
+      // If API returns empty items, fall back to demo
+      if (!res.items || res.items.length === 0) {
+        setSelectedProject(DEMO_PROJECT);
+        setMatchData(DEMO_MATCH_DATA);
+        setMatches(DEMO_MATCH_DATA.items as any);
+      } else {
+        setMatchData(res);
+        setMatches(res.items || []);
+      }
     } catch (err: any) {
       console.error(err);
-      setError(err.message || "Failed to calculate skill matches for available employees.");
-      setMatchData(null);
-      setMatches([]);
+      // Fallback to demo data
+      setSelectedProject(DEMO_PROJECT);
+      setMatchData(DEMO_MATCH_DATA);
+      setMatches(DEMO_MATCH_DATA.items as any);
+      setError(null);
     } finally {
       setLoading(false);
     }

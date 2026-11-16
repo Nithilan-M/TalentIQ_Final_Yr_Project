@@ -200,10 +200,17 @@ def validate_excel_import(file_bytes: bytes, db: Session) -> Dict[str, Any]:
             existing_count += 1
             existing_emp_ids.add(emp_id)
 
-        # Validate Status
-        status = str(emp.get("Status") or "Active").strip()
-        if status and status not in {"Active", "Inactive"}:
-            errors.append({"sheet": "Employees", "row": row_idx, "employee_id": emp_id, "field": "Status", "value": status, "problem": "Invalid status value", "allowed": "Active / Inactive"})
+        # Validate Status (case-insensitive with common workforce synonyms)
+        status_raw = str(emp.get("Status") or "Active").strip()
+        status_lower = status_raw.lower()
+        if status_lower in {"active", "available", "allocated", "assigned", "bench", "on bench", "working"}:
+            status = "Active"
+            emp["Status"] = "Active"
+        elif status_lower in {"inactive", "unavailable", "on leave", "leave", "resigned", "terminated", "notice period"}:
+            status = "Inactive"
+            emp["Status"] = "Inactive"
+        else:
+            errors.append({"sheet": "Employees", "row": row_idx, "employee_id": emp_id, "field": "Status", "value": status_raw, "problem": "Invalid status value", "allowed": "Active / Inactive (or Available, Bench, On Leave)"})
             invalid_emp_ids.add(emp_id)
             continue
 

@@ -1,0 +1,18 @@
+{
+  "seed": 42,
+  "split_ratio": "60/20/20",
+  "total_projects": 8,
+  "train_project_ids": [3, 4, 5, 7, 8],
+  "val_project_ids": [6],
+  "test_project_ids": [1, 2],
+  "project_metadata": {
+    "1": {"title": "Senior AI Engineer", "domain": "General", "required_team_size": 1},
+    "2": {"title": "Senior AI Engineer — Founding Team", "domain": "General", "required_team_size": 1},
+    "3": {"title": "Client_Visit_Intelligence", "domain": "Enterprise", "required_team_size": 6},
+    "4": {"title": "CVI_Scout_Logical_Architecture_v1", "domain": "Enterprise", "required_team_size": 1},
+    "5": {"title": "CVI_Scout_Logical_Architecture_v1", "domain": "Enterprise", "required_team_size": 1},
+    "6": {"title": "REQUIREMENTS DOCUMENT", "domain": "Healthcare", "required_team_size": 6},
+    "7": {"title": "AI Healthcare Management Platform", "domain": "Healthcare", "required_team_size": 6},
+    "8": {"title": "AI_Healthcare_Management_Platform", "domain": "Healthcare", "required_team_size": 6}
+  }
+}

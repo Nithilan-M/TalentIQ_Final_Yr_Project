@@ -5,6 +5,9 @@ from dotenv import load_dotenv
 from typing import List
 import httpx
 
+# Set OpenMP environment variable to prevent Windows duplicate runtime abort
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+
 # Load env variables
 load_dotenv()
 
@@ -13,16 +16,21 @@ HAS_FAISS = False
 HAS_SENTENCE_TRANSFORMERS = False
 
 try:
-    import faiss
-    HAS_FAISS = True
+    import torch
 except ImportError:
-    print("Warning: faiss-cpu not found. Using numpy fallback for vector search.")
+    pass
 
 try:
     from sentence_transformers import SentenceTransformer
     HAS_SENTENCE_TRANSFORMERS = True
 except ImportError:
     print("Warning: sentence-transformers not found. Using Gemini Embedding API fallback.")
+
+try:
+    import faiss
+    HAS_FAISS = True
+except ImportError:
+    print("Warning: faiss-cpu not found. Using numpy fallback for vector search.")
 
 class VectorStoreManager:
     def __init__(self):
@@ -32,10 +40,10 @@ class VectorStoreManager:
         self.candidate_ids = [] # Maps index position to SQL candidate database ID
         self.embeddings_list = [] # Used for NumPy fallback
 
-        # Initialize the embedding model if available
-        if HAS_SENTENCE_TRANSFORMERS:
+    def _ensure_model(self):
+        """Lazy load SentenceTransformer model on first usage rather than import time."""
+        if self.model is None and HAS_SENTENCE_TRANSFORMERS:
             try:
-                # Load BGE-small-en-v1.5 locally
                 print("Loading local BGE Small embedding model...")
                 self.model = SentenceTransformer('BAAI/bge-small-en-v1.5')
                 self.dimension = 384
@@ -48,6 +56,8 @@ class VectorStoreManager:
         """Generate a vector embedding for the given text."""
         if not text or not text.strip():
             return [0.0] * self.dimension
+
+        self._ensure_model()
 
         # Primary: Local BGE Small
         if HAS_SENTENCE_TRANSFORMERS and self.model is not None:
@@ -72,6 +82,8 @@ class VectorStoreManager:
         """Generate vector embeddings for a list of texts in batch mode."""
         if not texts:
             return []
+
+        self._ensure_model()
 
         # Primary: Local BGE Small
         if HAS_SENTENCE_TRANSFORMERS and self.model is not None:

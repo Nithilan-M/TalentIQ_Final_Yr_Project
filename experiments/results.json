@@ -1,0 +1,13 @@
+{
+  "ndcg_at_k": {
+    "K": [1, 3, 5, 10],
+    "TF-IDF": null,
+    "BGE-Small": null,
+    "TalentIQ": null
+  },
+  "latency_ms": {
+    "TF-IDF retrieval": 1.0,
+    "BGE-Small + FAISS retrieval": 127.07,
+    "TalentIQ full pipeline": 170.58
+  }
+}

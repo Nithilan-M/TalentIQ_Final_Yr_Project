@@ -1,42 +1,71 @@
 import os
 import sys
+
+# Prevent OpenMP runtime conflict on Windows
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+
+# Pre-initialize PyTorch and FAISS C++ runtimes early before other C extensions load
+try:
+    import torch
+except ImportError:
+    pass
+
+try:
+    import faiss
+except ImportError:
+    pass
+
+try:
+    import sentence_transformers
+except ImportError:
+    pass
+
 from contextlib import asynccontextmanager
 
 # Add the project root to sys.path so backend imports resolve when run directly from this folder
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
+curr_pp = os.environ.get("PYTHONPATH", "")
+if project_root not in curr_pp:
+    os.environ["PYTHONPATH"] = f"{project_root}{os.pathsep}{curr_pp}".strip(os.pathsep)
 
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.database.connection import engine, Base, SessionLocal
-from backend.database.models import User, Candidate, EmployeeSkill, Project, Certification, CandidateEmbedding, Skill, ProjectShortlist
+from backend.database.models import (
+    User, Candidate, EmployeeSkill, Project, Certification, 
+    CandidateEmbedding, Skill, ProjectShortlist, JobDescription
+)
 from backend.api import auth, job_desc, resume, candidate, analytics, reports, challenge, employee, skills, availability, matching, ranking, shortlist, dashboard, ai
 from backend.api.auth import get_password_hash
 from backend.embeddings.vector_store import vector_store_manager
-
 from sqlalchemy import inspect, text
 
-# Initialize Database tables
-Base.metadata.create_all(bind=engine)
-
+# Database columns synchronization helper
 def sync_db_columns():
     """Ensure missing columns in existing database tables are dynamically added."""
     try:
         is_postgres = "postgresql" in str(engine.url).lower()
         with engine.connect() as conn:
             inspector = inspect(engine)
+            existing_tables = set(inspector.get_table_names())
+            columns_by_table = {
+                t: {c["name"] for c in inspector.get_columns(t)}
+                for t in ["job_descriptions", "project_skill_requirements", "candidates", "employee_skills", "projects", "certifications"]
+                if t in existing_tables
+            }
             
             # Helper to safely add column
             def add_col_if_missing(table_name, col_name, pg_type, sqlite_type):
-                if table_name in inspector.get_table_names():
-                    existing_cols = [c["name"] for c in inspector.get_columns(table_name)]
-                    if col_name not in existing_cols:
+                if table_name in columns_by_table:
+                    if col_name not in columns_by_table[table_name]:
                         col_type = pg_type if is_postgres else sqlite_type
                         try:
                             conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type}"))
                             conn.commit()
+                            columns_by_table[table_name].add(col_name)
                         except Exception as e:
                             conn.rollback()
                             print(f"Notice adding column {table_name}.{col_name}: {e}")
@@ -87,6 +116,55 @@ def sync_db_columns():
                     conn.commit()
                 except Exception as e:
                     conn.rollback()
+            else:
+                try:
+                    res = conn.execute(text("PRAGMA table_info(candidates)")).fetchall()
+                    jd_col = next((c for c in res if c[1] == "job_description_id"), None)
+                    if jd_col and jd_col[3] == 1:
+                        # SQLite NOT NULL constraint needs table rebuild
+                        conn.execute(text("PRAGMA foreign_keys = OFF;"))
+                        existing_cols = [c[1] for c in res]
+                        cols_sql = ", ".join(existing_cols)
+                        conn.execute(text(f"""
+                            CREATE TABLE candidates_fix (
+                                id INTEGER PRIMARY KEY,
+                                job_description_id INTEGER,
+                                name VARCHAR NOT NULL,
+                                email VARCHAR,
+                                phone VARCHAR,
+                                skills JSON,
+                                technical_summary TEXT,
+                                achievements JSON,
+                                languages JSON,
+                                created_at DATETIME,
+                                employee_id VARCHAR,
+                                department VARCHAR,
+                                designation VARCHAR,
+                                total_experience_years FLOAT,
+                                status VARCHAR DEFAULT 'Active',
+                                current_project VARCHAR,
+                                assignment_start_date VARCHAR,
+                                assignment_end_date VARCHAR,
+                                available_from VARCHAR,
+                                allocation_percentage INTEGER DEFAULT 100,
+                                performance_rating FLOAT,
+                                performance_review_period VARCHAR,
+                                performance_notes TEXT,
+                                domain_experience JSON DEFAULT '[]',
+                                updated_at DATETIME,
+                                FOREIGN KEY(job_description_id) REFERENCES job_descriptions(id)
+                            );
+                        """))
+                        conn.execute(text(f"INSERT INTO candidates_fix ({cols_sql}) SELECT {cols_sql} FROM candidates;"))
+                        conn.execute(text("DROP TABLE candidates;"))
+                        conn.execute(text("ALTER TABLE candidates_fix RENAME TO candidates;"))
+                        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_candidates_id ON candidates(id);"))
+                        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_candidates_name ON candidates(name);"))
+                        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_candidates_employee_id ON candidates(employee_id);"))
+                        conn.commit()
+                except Exception as e:
+                    conn.rollback()
+                    print(f"Notice syncing SQLite candidates nullability: {e}")
 
             # 4. employee_skills table column sync
             add_col_if_missing("employee_skills", "skill_id", "INTEGER REFERENCES skill_taxonomy(id)", "INTEGER")
@@ -106,8 +184,6 @@ def sync_db_columns():
 
     except Exception as exc:
         print(f"Database column sync notice: {exc}")
-
-sync_db_columns()
 
 
 def seed_sample_employees(db):
@@ -557,6 +633,13 @@ async def lifespan(app: FastAPI):
     3. Seeds 10 sample employees if Employee Master Data is empty.
     4. Syncs/rebuilds the FAISS/NumPy in-memory vector search index.
     """
+    # 1. Initialize Database tables & sync dynamic columns
+    try:
+        Base.metadata.create_all(bind=engine)
+        sync_db_columns()
+    except Exception as e:
+        print(f"Notice during database tables/columns initialization: {e}")
+
     db = SessionLocal()
     try:
         # Seed default admin / PM recruiter users if none exists
@@ -590,14 +673,17 @@ async def lifespan(app: FastAPI):
             db.commit()
 
         # Sync/build semantic vector search index
-        print("Synchronizing semantic vector index from database...")
         embeddings_list = db.query(CandidateEmbedding).all()
-        candidates_data = [
-            {"candidate_id": item.candidate_id, "embedding": item.embedding}
-            for item in embeddings_list
-        ]
-        vector_store_manager.build_index(candidates_data)
-        print("Semantic vector index synchronized successfully.")
+        if embeddings_list:
+            print("Synchronizing semantic vector index from database...")
+            candidates_data = [
+                {"candidate_id": item.candidate_id, "embedding": item.embedding}
+                for item in embeddings_list
+            ]
+            vector_store_manager.build_index(candidates_data)
+            print("Semantic vector index synchronized successfully.")
+        else:
+            print("Database candidate embeddings empty; preserving local index vectors.")
         
     except Exception as e:
         print(f"Error during server startup: {e}")
